@@ -19,6 +19,12 @@ public class RazorBehaviour : MonoBehaviour
 	
 	private Point2D m_lastTexPoint;
 	
+	private static readonly Vector3 PutAsideDestinationPosition = new Vector3(0.0f, -0.06f, 0.12f);
+	private bool m_isPuttingAside;
+	private float m_putAsideProgress;
+	private Vector3 m_putAsidePosition;
+	private Quaternion m_putAsideRotation;
+	
 	/// <summary>
 	/// Rotation based on beard normal but without roll angle.
 	/// </summary>
@@ -44,6 +50,32 @@ public class RazorBehaviour : MonoBehaviour
 	
 	void Update()
 	{
+		if (m_isPuttingAside)
+		{			
+			Vector3 velocity = Vector3.zero;
+			
+			transform.localPosition =
+				Vector3.SmoothDamp(transform.localPosition, m_putAsidePosition, ref velocity, 0.05f);
+			
+			velocity = Vector3.zero;
+			
+//			transform.localRotation = Quaternion.LookRotation(
+//				Vector3.SmoothDamp(
+//					transform.forward,
+//					//Vector3.forward,
+//					Vector3.forward,
+//					ref velocity,
+//					10.5f));
+			
+			transform.localRotation =
+				Quaternion.Slerp(
+					transform.localRotation,
+					m_putAsideRotation,
+					10.0f * Time.deltaTime);
+		}
+		
+		return;
+		
 		if (Input.GetKey(KeyCode.Q))
 			m_razorRoll += 100.0f * Time.deltaTime;
 		
@@ -125,6 +157,38 @@ public class RazorBehaviour : MonoBehaviour
 		
 		if (isTexModified)
 			((Texture2D)m_breadMeshRenderer.material.mainTexture).Apply(true);
+	}
+	
+	public void PutAside()
+	{
+		m_isPuttingAside = true;
+		m_putAsidePosition = PutAsideDestinationPosition;
+		m_putAsideRotation =
+			Quaternion.AngleAxis(30, Vector3.forward) *
+			Quaternion.AngleAxis(-90, Vector3.right);
+	}
+	
+	public void PutToFace(Vector3 position, Vector3 forward)
+	{
+		m_isPuttingAside = false;
+		
+		Ray razorRay = new Ray(position, forward);
+		RaycastHit hit;
+		if (m_beardMeshCollider.Raycast(razorRay, out hit, float.MaxValue))
+		{
+			//transform.position = hit.point;
+			//transform.LookAt(-hit.normal, Vector3.up);
+			//m_baseRotation.SetLookRotation(-hit.normal, Vector3.up);
+			
+			m_isPuttingAside = true;
+			m_putAsidePosition = transform.parent.worldToLocalMatrix.MultiplyPoint(hit.point);
+			m_putAsideRotation = Quaternion.LookRotation(transform.parent.worldToLocalMatrix.MultiplyVector(-hit.normal));
+		}
+	}
+	
+	public void MoveHorizontal(float val)
+	{
+		
 	}
 	
 	private void SetPixel(Point2D point, Color color)

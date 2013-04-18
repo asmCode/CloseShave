@@ -34,12 +34,12 @@ public class CameraBehaviour : MonoBehaviour
 	public void OrbitHorizontal(float angle)
 	{
 		m_horiAngle += angle;
-		m_horiAngle = Mathf.Clamp(m_horiAngle, -90.0f, 90.0f);
+		m_horiAngle = Mathf.Clamp(m_horiAngle, -80.0f, 80.0f);
 	}
 	
 	public void OrbitVertical(float angle)
 	{
 		m_vertAngle += angle;
-		m_vertAngle = Mathf.Clamp(m_vertAngle, -30.0f, 30.0f);
+		m_vertAngle = Mathf.Clamp(m_vertAngle, -40.0f, -3.0f);
 	}
 }

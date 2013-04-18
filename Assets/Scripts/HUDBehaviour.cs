@@ -20,7 +20,11 @@ public class HUDBehaviour : MonoBehaviour
 
 	void Start()
 	{
-	
+		m_camera.transform.position =
+			-Vector3.up * 0.02f +
+			 -Vector3.forward * 0.3f;
+		m_camera.transform.LookAt(Vector3.zero, Vector3.up);
+		m_razor.PutToFace(m_camera.transform.position, m_camera.transform.forward);
 	}
 	
 	void Update()
@@ -46,9 +50,28 @@ public class HUDBehaviour : MonoBehaviour
 			m_razor.PutToFace(m_camera.transform.position, m_camera.transform.forward);
 		}
 		
-		//if (m_rmbDown)
+		if (Input.GetMouseButtonDown(0))
 		{
-			
+			Screen.lockCursor = true;
+			m_razor.StartShaving();
 		}
+		else if (Input.GetMouseButtonUp(0))
+		{
+			Screen.lockCursor = false;
+			m_razor.StopShaving();
+		}
+		
+		if (!m_razor.IsRotating)
+		{
+			m_razor.MoveHorizontal(Input.GetAxis("Mouse X") * 5.0f);
+			m_razor.MoveVertical(Input.GetAxis("Mouse Y") * -5.0f);
+		}
+	}
+	
+	void OnGUI()
+	{
+		GUI.Label(new Rect(10, 30, 400, 20), "Ruch myszką - Pozycjonowanie brzytwy");
+		GUI.Label(new Rect(10, 50, 400, 20), "Lewy przycisk myszki + ruch myszką - Golenie");
+		GUI.Label(new Rect(10, 70, 400, 20), "Prawy przycisk myszki + ruch myszką - Obracanie mordy");
 	}
 }

@@ -9,7 +9,6 @@ public class RazorBehaviour : MonoBehaviour
 	private MeshRenderer m_breadMeshRenderer;
 	private Texture2D m_beardTexture;
 	
-	private Vector3 m_razorShift = new Vector3();
 	private float m_razorRoll;
 	
 	private Color[] m_eraseShape;
@@ -24,6 +23,11 @@ public class RazorBehaviour : MonoBehaviour
 	private float m_putAsideProgress;
 	private Vector3 m_putAsidePosition;
 	private Quaternion m_putAsideRotation;
+	
+	private bool m_isShaving;
+	private bool m_isRotating;
+	
+	private bool m_isLastTexPointSet;
 	
 	/// <summary>
 	/// Rotation based on beard normal but without roll angle.
@@ -59,22 +63,19 @@ public class RazorBehaviour : MonoBehaviour
 			
 			velocity = Vector3.zero;
 			
-//			transform.localRotation = Quaternion.LookRotation(
-//				Vector3.SmoothDamp(
-//					transform.forward,
-//					//Vector3.forward,
-//					Vector3.forward,
-//					ref velocity,
-//					10.5f));
-			
 			transform.localRotation =
 				Quaternion.Slerp(
 					transform.localRotation,
 					m_putAsideRotation,
-					10.0f * Time.deltaTime);
+					Mathf.Min(1.0f, 8.0f * Time.deltaTime));
+			
+			if (Vector3.Distance(transform.localPosition, m_putAsidePosition) < 0.001f)
+			{
+				m_isPuttingAside = false;
+				transform.localPosition = m_putAsidePosition;
+				transform.localRotation = m_putAsideRotation;
+			}
 		}
-		
-		return;
 		
 		if (Input.GetKey(KeyCode.Q))
 			m_razorRoll += 100.0f * Time.deltaTime;
@@ -82,85 +83,50 @@ public class RazorBehaviour : MonoBehaviour
 		if (Input.GetKey(KeyCode.W))
 			m_razorRoll -= 100.0f * Time.deltaTime;
 		
+		if (m_isShaving)
+		{	
+			bool isTexModified = false;
+			
+			Ray razorRay1 = new Ray(m_edges[0].transform.position - transform.forward * 0.01f, transform.forward);
+			Ray razorRay2 = new Ray(m_edges[m_edges.Length - 1].transform.position - transform.forward * 0.01f, transform.forward);
+			RaycastHit hit1;
+			RaycastHit hit2;
 		
-		m_razorShift.x += Input.GetAxis("Mouse X") * 0.01f;
-		m_razorShift.y += Input.GetAxis("Mouse Y") * 0.01f;
-		//m_razorShift.z = -0.14f;
-		
-		Vector3 rayPoint =
-			transform.position +
-			(m_baseRotation * Vector3.up) * Input.GetAxis("Mouse Y") * 0.01f +
-			(m_baseRotation * Vector3.right) * Input.GetAxis("Mouse X") * 0.01f -
-			transform.forward * 1.0f;
-		
-		{
-			Ray razorRay = new Ray(rayPoint, transform.forward);
-			RaycastHit hit;
-			if (m_beardMeshCollider.Raycast(razorRay, out hit, float.MaxValue))
+			if (m_beardMeshCollider.Raycast(razorRay1, out hit1, float.MaxValue) &&
+			    m_beardMeshCollider.Raycast(razorRay2, out hit2, float.MaxValue))
 			{
-				transform.position = hit.point;
-				transform.LookAt(-hit.normal, Quaternion.AngleAxis(m_razorRoll, transform.forward) * Vector3.up);
-				m_baseRotation.SetLookRotation(-hit.normal, Vector3.up);
+				isTexModified = true;
+				
+				Point2D p1 = new Point2D(
+					(int)((float)m_beardTexture.width * hit1.textureCoord.x),
+					(int)((float)m_beardTexture.height * hit1.textureCoord.y));
+				
+				Point2D p2 = new Point2D(
+					(int)((float)m_beardTexture.width * hit2.textureCoord.x),
+					(int)((float)m_beardTexture.height * hit2.textureCoord.y));
+				
+				m_edgeDir = p2 - p1;
+				
+				if (!m_isLastTexPointSet)
+				{
+					m_isLastTexPointSet = true;
+					m_lastTexPoint = p1;
+				}
+				
+				ShapesRenderer.DrawLine(m_beardTexture, p1, m_lastTexPoint, new Color(0, 0, 0, 0), MoveAlongLine);
+				
+				m_lastTexPoint = p1;
 			}
-			else
-			{
-				//transform.position = rayPoint;
-				return;
-			}
+			
+			if (isTexModified)
+				((Texture2D)m_breadMeshRenderer.material.mainTexture).Apply(true);
 		}
-		
-		bool isTexModified = false;
-		
-//		for (int i = 0; i < m_edges.Length; i++)
-//		{
-//			Ray razorRay = new Ray(m_edges[i].transform.position - transform.forward * 0.01f, transform.forward);
-//			RaycastHit hit;
-//			if (m_beardMeshCollider.Raycast(razorRay, out hit, float.MaxValue))
-//			{
-//				isTexModified = true;
-//				
-//				int texXCoord = (int)((float)m_breadMeshRenderer.material.mainTexture.width * hit.textureCoord.x);
-//				int texYCoord = (int)((float)m_breadMeshRenderer.material.mainTexture.height * hit.textureCoord.y);
-//				
-//				((Texture2D)m_breadMeshRenderer.material.mainTexture).SetPixels(texXCoord, texYCoord, 4, 4, m_eraseShape);
-//			}
-//		}
-		
-		
-		
-		Ray razorRay1 = new Ray(m_edges[0].transform.position - transform.forward * 0.01f, transform.forward);
-		Ray razorRay2 = new Ray(m_edges[m_edges.Length - 1].transform.position - transform.forward * 0.01f, transform.forward);
-		RaycastHit hit1;
-		RaycastHit hit2;
-	
-		if (m_beardMeshCollider.Raycast(razorRay1, out hit1, float.MaxValue) &&
-		    m_beardMeshCollider.Raycast(razorRay2, out hit2, float.MaxValue))
-		{
-			isTexModified = true;
-			
-			Point2D p1 = new Point2D(
-				(int)((float)m_beardTexture.width * hit1.textureCoord.x),
-				(int)((float)m_beardTexture.height * hit1.textureCoord.y));
-			
-			Point2D p2 = new Point2D(
-				(int)((float)m_beardTexture.width * hit2.textureCoord.x),
-				(int)((float)m_beardTexture.height * hit2.textureCoord.y));
-			
-			m_edgeDir = p2 - p1;
-			
-			//ShapesRenderer.DrawLine(m_beardTexture, x1, y1, x1, y1 + 5, new Color(0, 0, 0, 0), MoveAlongLine);
-			ShapesRenderer.DrawLine(m_beardTexture, p1, m_lastTexPoint, new Color(0, 0, 0, 0), MoveAlongLine);
-			//((Texture2D)m_breadMeshRenderer.material.mainTexture).SetPixels(texXCoord, texYCoord, 4, 4, m_eraseShape);
-			
-			m_lastTexPoint = p1;
-		}
-		
-		if (isTexModified)
-			((Texture2D)m_breadMeshRenderer.material.mainTexture).Apply(true);
 	}
 	
 	public void PutAside()
 	{
+		m_isRotating = true;
+		
 		m_isPuttingAside = true;
 		m_putAsidePosition = PutAsideDestinationPosition;
 		m_putAsideRotation =
@@ -170,6 +136,7 @@ public class RazorBehaviour : MonoBehaviour
 	
 	public void PutToFace(Vector3 position, Vector3 forward)
 	{
+		m_isRotating = false;
 		m_isPuttingAside = false;
 		
 		Ray razorRay = new Ray(position, forward);
@@ -182,14 +149,74 @@ public class RazorBehaviour : MonoBehaviour
 			
 			m_isPuttingAside = true;
 			m_putAsidePosition = transform.parent.worldToLocalMatrix.MultiplyPoint(hit.point);
-			m_putAsideRotation = Quaternion.LookRotation(transform.parent.worldToLocalMatrix.MultiplyVector(-hit.normal));
+			m_putAsideRotation = Quaternion.LookRotation(transform.parent.worldToLocalMatrix.MultiplyVector(-hit.normal), Vector3.up);
+			m_baseRotation=Quaternion.LookRotation(transform.parent.worldToLocalMatrix.MultiplyVector(-hit.normal), Vector3.up);
+			
 		}
 	}
 	
 	public void MoveHorizontal(float val)
 	{
-		
+		if (m_isPuttingAside)
+			return;
+			
+		Vector3 rayPoint =
+		transform.position +
+		//(m_baseRotation * Vector3.right) * val * 0.001f -
+		transform.right * val * 0.001f -
+		transform.forward * 1.0f;
+	
+		Ray razorRay = new Ray(rayPoint, transform.forward);
+		RaycastHit hit;
+		if (m_beardMeshCollider.Raycast(razorRay, out hit, float.MaxValue))
+		{
+			transform.position = hit.point;
+			//transform.LookAt(-hit.normal, Quaternion.AngleAxis(m_razorRoll, transform.forward) * Vector3.up);
+			transform.localRotation = Quaternion.LookRotation(transform.parent.worldToLocalMatrix.MultiplyVector(-hit.normal), Quaternion.AngleAxis(m_razorRoll, transform.forward) * Vector3.up);
+			//m_baseRotation.SetLookRotation(-hit.normal, Vector3.up);
+			m_baseRotation=Quaternion.LookRotation(transform.parent.worldToLocalMatrix.MultiplyVector(-hit.normal), Vector3.up);
+		}
 	}
+	
+	public void MoveVertical(float val)
+	{		
+		if (m_isPuttingAside)
+			return;
+		
+		Vector3 rayPoint =
+		transform.position +
+		//(m_baseRotation * Vector3.up) * val * -0.001f -
+		transform.up * val * -0.001f -
+		transform.forward * 1.0f;
+	
+		Ray razorRay = new Ray(rayPoint, transform.forward);
+		RaycastHit hit;
+		if (m_beardMeshCollider.Raycast(razorRay, out hit, float.MaxValue))
+		{
+			transform.position = hit.point;
+			//transform.LookAt(-hit.normal, Quaternion.AngleAxis(m_razorRoll, transform.forward) * Vector3.up);
+			//transform.rotation = Quaternion.LookRotation(-hit.normal, Quaternion.AngleAxis(m_razorRoll, transform.forward) * Vector3.up);
+			transform.localRotation = Quaternion.LookRotation(transform.parent.worldToLocalMatrix.MultiplyVector(-hit.normal), Quaternion.AngleAxis(m_razorRoll, transform.forward) * Vector3.up);
+			//m_baseRotation.SetLookRotation(-hit.normal, Vector3.up);
+			m_baseRotation=Quaternion.LookRotation(transform.parent.worldToLocalMatrix.MultiplyVector(-hit.normal), Vector3.up);
+		}
+	}
+	
+	public void StartShaving()
+	{
+		m_isPuttingAside = false;
+		m_isShaving = true;
+		
+		m_isLastTexPointSet = false;
+	}
+	
+	public void StopShaving()
+	{
+		m_isShaving = false;
+	}
+	
+	public bool IsShaving { get { return m_isShaving; } }
+	public bool IsRotating { get { return m_isRotating; } }
 	
 	private void SetPixel(Point2D point, Color color)
 	{
